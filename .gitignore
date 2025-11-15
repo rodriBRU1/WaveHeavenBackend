@@ -1,3 +1,17 @@
+# ============================================
+# Archivos del proyecto (no subir)
+# ============================================
+CLAUDE.md
+Sprint*.pptx
+Sprint*.zip
+temp_sprint*/
+temp_sprint*/**
+sprint*_content.txt
+nul
+
+# ============================================
+# Maven y Build
+# ============================================
 HELP.md
 target/
 .mvn/wrapper/maven-wrapper.jar
