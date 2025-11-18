@@ -1,5 +1,7 @@
 package com.waveheaven.back.products.entity;
 
+import com.waveheaven.back.categories.entity.Category;
+import com.waveheaven.back.characteristics.entity.Characteristic;
 import com.waveheaven.back.shared.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -21,6 +23,19 @@ public class Product extends BaseEntity {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
+
+    @ManyToMany
+    @JoinTable(
+            name = "product_characteristics",
+            joinColumns = @JoinColumn(name = "product_id"),
+            inverseJoinColumns = @JoinColumn(name = "characteristic_id")
+    )
+    @Builder.Default
+    private List<Characteristic> characteristics = new ArrayList<>();
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default

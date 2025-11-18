@@ -21,4 +21,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query("SELECT p FROM Product p LEFT JOIN FETCH p.images WHERE p.id = :id")
     Optional<Product> findByIdWithImages(Long id);
+
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images WHERE p.category.id = :categoryId")
+    Page<Product> findByCategoryId(Long categoryId, Pageable pageable);
+
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.category.id = :categoryId")
+    long countByCategoryId(Long categoryId);
 }

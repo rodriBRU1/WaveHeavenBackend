@@ -1,5 +1,9 @@
 package com.waveheaven.back.products.service;
 
+import com.waveheaven.back.categories.entity.Category;
+import com.waveheaven.back.categories.repository.CategoryRepository;
+import com.waveheaven.back.characteristics.entity.Characteristic;
+import com.waveheaven.back.characteristics.repository.CharacteristicRepository;
 import com.waveheaven.back.products.dto.CreateProductRequest;
 import com.waveheaven.back.products.dto.ProductResponse;
 import com.waveheaven.back.products.dto.UpdateProductRequest;
@@ -29,6 +33,8 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepository;
+    private final CharacteristicRepository characteristicRepository;
     private final ProductMapper productMapper;
     private final Random random = new Random();
 
@@ -42,6 +48,20 @@ public class ProductService {
         }
 
         Product product = productMapper.toEntity(request);
+
+        // Asignar categoría si se proporciona
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + request.getCategoryId()));
+            product.setCategory(category);
+        }
+
+        // Asignar características si se proporcionan
+        if (request.getCharacteristicIds() != null && !request.getCharacteristicIds().isEmpty()) {
+            List<Characteristic> characteristics = characteristicRepository.findByIdIn(request.getCharacteristicIds());
+            product.setCharacteristics(characteristics);
+        }
+
         Product savedProduct = productRepository.save(product);
 
         log.info("Product created successfully with ID: {}", savedProduct.getId());
@@ -110,6 +130,19 @@ public class ProductService {
             product.setDescription(request.getDescription());
         }
 
+        // Actualizar categoría si se proporciona
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + request.getCategoryId()));
+            product.setCategory(category);
+        }
+
+        // Actualizar características si se proporcionan
+        if (request.getCharacteristicIds() != null) {
+            List<Characteristic> characteristics = characteristicRepository.findByIdIn(request.getCharacteristicIds());
+            product.setCharacteristics(characteristics);
+        }
+
         // Actualizar imágenes si se proporcionan
         if (request.getImages() != null) {
             product.getImages().clear();
@@ -139,5 +172,20 @@ public class ProductService {
 
         productRepository.deleteById(id);
         log.info("Product deleted successfully with ID: {}", id);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> getProductsByCategory(Long categoryId, int page, int size) {
+        log.info("Fetching products by category ID: {} - page: {}, size: {}", categoryId, page, size);
+
+        // Verificar que la categoría existe
+        if (!categoryRepository.existsById(categoryId)) {
+            throw new ResourceNotFoundException("Category not found with ID: " + categoryId);
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Product> productPage = productRepository.findByCategoryId(categoryId, pageable);
+
+        return productPage.map(productMapper::toResponse);
     }
 }

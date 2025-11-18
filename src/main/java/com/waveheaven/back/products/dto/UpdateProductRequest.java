@@ -20,6 +20,10 @@ public class UpdateProductRequest {
 
     private String description;
 
+    private Long categoryId;
+
+    private List<Long> characteristicIds;
+
     @Valid
     private List<ImageDTO> images;
 }

@@ -77,4 +77,15 @@ public class ProductController {
         productService.deleteProduct(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/category/{categoryId}")
+    @Operation(summary = "Get products by category", description = "Retrieves products filtered by category with pagination")
+    public ResponseEntity<Page<ProductResponse>> getProductsByCategory(
+            @PathVariable Long categoryId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        log.info("GET /api/products/category/{} - Fetching products by category", categoryId);
+        Page<ProductResponse> response = productService.getProductsByCategory(categoryId, page, size);
+        return ResponseEntity.ok(response);
+    }
 }

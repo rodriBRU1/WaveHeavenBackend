@@ -24,6 +24,10 @@ public class CreateProductRequest {
     @NotBlank(message = "Product description is required")
     private String description;
 
+    private Long categoryId;
+
+    private List<Long> characteristicIds;
+
     @NotEmpty(message = "At least one image is required")
     @Valid
     private List<ImageDTO> images;
