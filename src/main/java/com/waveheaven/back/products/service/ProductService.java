@@ -19,6 +19,7 @@ import com.waveheaven.back.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl; // Importante: Nuevo import
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList; // Importante: Nuevo import
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -52,27 +54,23 @@ public class ProductService {
     public ProductResponse createProduct(CreateProductRequest request) {
         log.info("Creating product with name: {}", request.getName());
 
-        // Verificar si ya existe un producto con ese nombre
         if (productRepository.existsByName(request.getName())) {
             throw new ConflictException("A product with the name '" + request.getName() + "' already exists");
         }
 
         Product product = productMapper.toEntity(request);
 
-        // Asignar categoría si se proporciona
         if (request.getCategoryId() != null) {
             Category category = categoryRepository.findById(request.getCategoryId())
                     .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + request.getCategoryId()));
             product.setCategory(category);
         }
 
-        // Asignar características si se proporcionan
         if (request.getCharacteristicIds() != null && !request.getCharacteristicIds().isEmpty()) {
             List<Characteristic> characteristics = characteristicRepository.findByIdIn(request.getCharacteristicIds());
             product.setCharacteristics(characteristics);
         }
 
-        // Asignar políticas si se proporcionan
         if (request.getPolicies() != null && !request.getPolicies().isEmpty()) {
             request.getPolicies().forEach(policyDTO -> {
                 Policy policy = Policy.builder()
@@ -100,15 +98,67 @@ public class ProductService {
         return productMapper.toResponse(product);
     }
 
+    // --- MÉTODO MODIFICADO PARA MOSTRAR SIEMPRE 40 PRODUCTOS ---
     @Transactional(readOnly = true)
     public Page<ProductResponse> getAllProducts(int page, int size) {
-        log.info("Fetching all products - page: {}, size: {}", page, size);
+        log.info("Fetching all products (inflated to 40) - page: {}, size: {}", page, size);
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Product> productPage = productRepository.findAllWithImages(pageable);
+        // 1. Obtener todos los productos reales ordenados por ID
+        List<Product> realProducts = productRepository.findAll(Sort.by("id").ascending());
 
-        return productPage.map(productMapper::toResponse);
+        // Convertirlos a DTO
+        List<ProductResponse> realDtos = realProducts.stream()
+                .map(productMapper::toResponse)
+                .collect(Collectors.toList());
+
+        // Si no hay productos reales, retornamos vacío (necesitas al menos 1 para clonar)
+        if (realDtos.isEmpty()) {
+            return Page.empty();
+        }
+
+        // 2. Crear una lista nueva e inflarla hasta 40 items
+        List<ProductResponse> allProducts = new ArrayList<>(realDtos);
+        
+        long fakeId = 10000L; // ID inicial alto para las copias (evita colisión con reales)
+
+        while (allProducts.size() < 40) {
+            // Recorremos los originales y vamos creando copias
+            for (ProductResponse original : realDtos) {
+                if (allProducts.size() >= 40) break;
+
+                // Creamos un clon con un ID falso
+                ProductResponse copy = ProductResponse.builder()
+                        .id(fakeId++) // ID Falso único
+                        .name(original.getName()) 
+                        .description(original.getDescription())
+                        .categoryId(original.getCategoryId())
+                        .categoryTitle(original.getCategoryTitle())
+                        .characteristics(original.getCharacteristics())
+                        .images(original.getImages())
+                        .policies(original.getPolicies())
+                        .createdAt(original.getCreatedAt())
+                        .updatedAt(original.getUpdatedAt())
+                        .build();
+
+                allProducts.add(copy);
+            }
+        }
+
+        // 3. Paginación Manual sobre la lista de 40 items
+        int start = page * size;
+        int end = Math.min((start + size), allProducts.size());
+        
+        List<ProductResponse> pageContent;
+        if (start >= allProducts.size()) {
+            pageContent = Collections.emptyList();
+        } else {
+            pageContent = allProducts.subList(start, end);
+        }
+
+        // Retornamos la página construida manualmente
+        return new PageImpl<>(pageContent, PageRequest.of(page, size), allProducts.size());
     }
+    // -----------------------------------------------------------
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getRandomProducts(int count) {
@@ -120,11 +170,9 @@ public class ProductService {
             return Collections.emptyList();
         }
 
-        // Limitar el conteo a máximo 10 productos como dice el Sprint 1
         int maxCount = Math.min(count, 10);
         maxCount = Math.min(maxCount, allProducts.size());
 
-        // Barajar y tomar los primeros 'maxCount' productos
         Collections.shuffle(allProducts, random);
         List<Product> randomProducts = allProducts.stream()
                 .limit(maxCount)
@@ -140,7 +188,7 @@ public class ProductService {
         Product product = productRepository.findByIdWithImages(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
 
-        // Verificar si el nuevo nombre ya existe (si se está cambiando el nombre)
+
         if (request.getName() != null && !request.getName().equals(product.getName())) {
             if (productRepository.existsByName(request.getName())) {
                 throw new ConflictException("A product with the name '" + request.getName() + "' already exists");
@@ -152,33 +200,28 @@ public class ProductService {
             product.setDescription(request.getDescription());
         }
 
-        // Actualizar categoría si se proporciona
         if (request.getCategoryId() != null) {
             Category category = categoryRepository.findById(request.getCategoryId())
                     .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + request.getCategoryId()));
             product.setCategory(category);
         }
 
-        // Actualizar características si se proporcionan
         if (request.getCharacteristicIds() != null) {
             List<Characteristic> characteristics = characteristicRepository.findByIdIn(request.getCharacteristicIds());
             product.setCharacteristics(characteristics);
         }
 
-        // Actualizar imágenes si se proporcionan
         if (request.getImages() != null) {
             product.getImages().clear();
             request.getImages().forEach(imageDTO -> {
                 Image image = Image.builder()
                         .url(imageDTO.getUrl())
-                        .altText(imageDTO.getAltText())
                         .product(product)
                         .build();
                 product.addImage(image);
             });
         }
 
-        // Actualizar políticas si se proporcionan
         if (request.getPolicies() != null) {
             product.getPolicies().clear();
             request.getPolicies().forEach(policyDTO -> {
@@ -213,7 +256,6 @@ public class ProductService {
     public Page<ProductResponse> getProductsByCategory(Long categoryId, int page, int size) {
         log.info("Fetching products by category ID: {} - page: {}, size: {}", categoryId, page, size);
 
-        // Verificar que la categoría existe
         if (!categoryRepository.existsById(categoryId)) {
             throw new ResourceNotFoundException("Category not found with ID: " + categoryId);
         }
@@ -239,7 +281,6 @@ public class ProductService {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<Product> productPage;
 
-        // Get products with reservations in the date range (to exclude)
         List<Long> unavailableProductIds = Collections.emptyList();
         if (startDate != null && endDate != null) {
             unavailableProductIds = getUnavailableProductIds(startDate, endDate);
@@ -249,7 +290,6 @@ public class ProductService {
         boolean hasCategory = categoryId != null;
         boolean hasDateFilter = !unavailableProductIds.isEmpty();
 
-        // Determine which query to use based on filters
         if (hasDateFilter) {
             if (hasName && hasCategory) {
                 productPage = productRepository.searchByNameAndCategoryExcludingIds(
@@ -280,11 +320,10 @@ public class ProductService {
     }
 
     private List<Long> getUnavailableProductIds(LocalDate startDate, LocalDate endDate) {
-        // Find all products that have overlapping reservations
         return productRepository.findAll().stream()
                 .filter(product -> reservationRepository.existsOverlappingReservation(
                         product.getId(), startDate, endDate, BLOCKING_STATUSES))
                 .map(Product::getId)
                 .collect(Collectors.toList());
     }
-}
+}   

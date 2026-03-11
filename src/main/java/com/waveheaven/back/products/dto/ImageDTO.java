@@ -16,7 +16,7 @@ public class ImageDTO {
     private Long id;
 
     @NotBlank(message = "Image URL is required")
-    @Size(max = 500, message = "Image URL must not exceed 500 characters")
+    @Size(max = 10000000, message = "Image URL must not exceed 500 characters")
     private String url;
 
     @Size(max = 255, message = "Alt text must not exceed 255 characters")

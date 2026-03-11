@@ -24,12 +24,12 @@ public class ProductMapper {
                 .description(request.getDescription())
                 .build();
 
-        // Crear y asociar imágenes
+        // Crear y asociar imágenes (SIN altText)
         if (request.getImages() != null && !request.getImages().isEmpty()) {
             List<Image> images = request.getImages().stream()
                     .map(imageDTO -> Image.builder()
                             .url(imageDTO.getUrl())
-                            .altText(imageDTO.getAltText())
+                            // .altText(...) <--- ELIMINADO
                             .product(product)
                             .build())
                     .collect(Collectors.toList());
@@ -92,7 +92,6 @@ public class ProductMapper {
         return ImageDTO.builder()
                 .id(image.getId())
                 .url(image.getUrl())
-                .altText(image.getAltText())
                 .build();
     }
 
